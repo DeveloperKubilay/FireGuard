@@ -1,0 +1,5 @@
+Sohbet mesajlarını denetleyin 
+Etkinlik akışına abone olun (sohbet akışını okuma, ...)
+Moderatörler için moderasyon eylemlerini gerçekleştirme 
+Sohbet akışına yaz 
+Kullanıcı bilgilerini okuyun (e-posta adresi dahil)
