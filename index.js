@@ -6,7 +6,7 @@ const db = new kubitdb('./data');
 
 const CLIENT_ID = process.env.ID;
 const CLIENT_SECRET = process.env.SEC;
-const SCOPE = 'user:read events:subscribe chat:write moderation:ban moderation:chat_message:manage';
+const SCOPE = 'user:read events:subscribe chat:write moderation:ban moderation:chat_message:manage channel:read';
 const REDIRECT_URI = `http://localhost:3000/callback`;
 
 
@@ -25,8 +25,6 @@ if (db.has('tokens')) db.get('tokens').forEach(tokenData => {
         UserDatas.set(tokenData.username, tokenData);
     }
 });
-
-app.get('/', (req, res) => res.send(`<a href="/login">Kick ile giriş yap</a>`));
 
 app.get('/login', (req, res) => {
     const state = base64url(crypto.randomBytes(12));
@@ -59,12 +57,13 @@ app.get('/callback', async (req, res) => {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
         const data = tokenRes.data;
-        data.username = await getCurrentUserId(data.access_token);
-        console.log(params.toString());
+        data.userdata = await getCurrentUserId(data.access_token);
+        data.username = data.userdata ? data.userdata.name : 'unknown';
         UserDatas.set(data.username, data);
-        db.push('tokens', data);
+        db.set('tokens', db.get('tokens').filter(t => t.username !== data.username).concat([data]));
         console.log('Tokens:', data);
-        res.send('Token alındı ve kaydedildi. Konsolu kontrol et.');
+
+        res.send('Token alındı. Konsolu kontrol et.');
     } catch (err) {
         console.error(err.response ? err.response.data : err.message);
         res.status(500).send('Token exchange failed');
@@ -100,17 +99,40 @@ async function getCurrentUserId(token) {
     if (!token) return null;
     try {
         const r = await axios.get('https://api.kick.com/public/v1/users', { headers: { Authorization: `Bearer ${token}` } });
-        return r.data?.data[0]?.name;
+        return r.data?.data[0];
     } catch (e) { return null; }
 }
+
+
+async function isChannelLive(channel) {
+    const tokens = UserDatas.get(channel);
+    if (!tokens) return;
+    try {
+        const { data } = await axios.get(`https://api.kick.com/public/v1/channels?slug=${channel}`, {
+            headers: { 'Authorization': `Bearer ${tokens.access_token}` }
+        });
+        const channelData = data.data && data.data[0];
+        const isLive = channelData && channelData.stream && channelData.stream.is_live;
+        return !!isLive;
+    } catch (e) {
+        console.error('Error checking live status:', e.response ? e.response.data : e.message);
+    }
+
+    return false;
+}
+
+app.get('/islive', async (req, res) => {
+    const channel = req.query.channel;
+    const live = await isChannelLive(channel);
+    res.json({ channel, is_live: live });
+});
+
 
 app.get('/send', async (req, res) => {
     const channel = req.query.channel;
     const text = req.query.text;
     if (!channel) return res.status(400).send('No channel provided');
     if (!text) return res.status(400).send('No text provided');
-
-    console.log(await resolveBroadcasterId(channel));
 });
 //http://localhost:3000/send?channel=Dead_lock_yk&text=Merhaba%20dunya
 
