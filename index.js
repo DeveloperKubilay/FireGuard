@@ -5,6 +5,6 @@ const KickApi = require('./kickApi');
         clientId: process.env.CLIENT_ID, 
         clientSecret: process.env.CLIENT_SECRET 
     });
-    //await bot.send('Dead_lock_yk', 'Your message here');
+    await bot.send('channel name', 'Your message here');
 
 })();
